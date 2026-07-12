@@ -8,7 +8,7 @@
     <meta name="keywords" content="microgames,browser games,small games,fun games">
     <meta name="author" content="magentapenguin">
     <style>
-        @import '/static/theme.css';
+        @import '/microgames/static/theme.css';
         body {
             margin-inline: clamp(16px, 5vw, 64px);
             display: flex;
@@ -97,9 +97,9 @@
             color: var(--fg-2);
         }
     </style>
-    <link rel="icon" href="/static/favicon.ico">
-    <link rel="stylesheet" href="/static/theme-switcher.css">
-    <script src="/static/theme-switcher.js"></script>
+    <link rel="icon" href="/microgames/static/favicon.ico">
+    <link rel="stylesheet" href="/microgames/static/theme-switcher.css">
+    <script src="/microgames/static/theme-switcher.js"></script>
 </head>
 <body>
     <div>
@@ -134,7 +134,7 @@
             </script>
             % end
             <div style="flex-grow:1;margin-top:-8px;"></div>
-            <a href="/game/{{ id }}" class="play-button">
+            <a href="/microgames/game/{{ id }}" class="play-button">
                 Play
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="icon">
                     <path fill-rule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clip-rule="evenodd" />
