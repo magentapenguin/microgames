@@ -37,4 +37,6 @@ for id, game_ in games.items():
     game_['color'] = string_to_color(id)
 
 if __name__ == '__main__':
-    bottle.run(app, port=8080, debug=True)
+    bottle.mount('/microgames', app)
+    bottle.route('/', callback=lambda: bottle.redirect('/microgames'))
+    bottle.run(host='localhost', port=8080, debug=True, reloader=True)
