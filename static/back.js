@@ -1,4 +1,4 @@
-const home = '/';
+const home = '/microgames';
 const style = `
 .back-button {
     position: fixed;
