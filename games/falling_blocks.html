@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Falling Block Game</title>
+        <link rel="stylesheet" href="/static/theme-switcher.css" />
+        <script src="/static/theme-switcher.js"></script>
+        <style>
+            @import "/static/fonts/inter.css";
+            @import "/static/theme.css";
+            body {
+                margin: 0;
+                padding: 0;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                background-color: var(--bg-1);
+            }
+            canvas {
+                border: 1px solid var(--bg-2);
+                background-color: var(--bg-1);
+                anchor-name: --canvas;
+            }
+            #info {
+                position: absolute;
+                top: anchor(top);
+                right: calc(anchor(left) + 16px);
+                position-anchor: --canvas;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+            #nextPiece {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+            hr {
+                width: 100%;
+                border: 1px solid var(--bg-2);
+                margin: 8px 0;
+            }
+        </style>
+        <script src="/static/back.js"></script>
+    </head>
+    <body>
+        <div id="info">
+            <div id="score">Score: 0<br>Cleared Lines: 0</div>
+            <hr />
+            <div id="nextPiece">
+                Next
+                <canvas id="nextPieceCanvas" width="128" height="128"></canvas>
+            </div>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+        
+        <script type="module">
+            /**
+             * @type {HTMLCanvasElement}
+             */
+            const canvas = document.getElementById("gameCanvas");
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+                throw new Error("Failed to get canvas context");
+            }
+
+            const nextPieceCanvas = document.getElementById("nextPieceCanvas");
+            const nextPieceCtx = nextPieceCanvas.getContext("2d");
+
+            const rows = 20;
+            const cols = 10;
+            const blockSize = 32;
+            canvas.width = cols * blockSize;
+            canvas.height = rows * blockSize;
+            nextPieceCanvas.width = 4 * blockSize;
+            nextPieceCanvas.height = 4 * blockSize;
+
+            const colors = {
+                cyan: "#00ffff",
+                yellow: "#ffff00",
+                purple: "#ff00ff",
+                green: "#00ff00",
+                red: "#ff0000",
+                blue: "#0000ff",
+                orange: "#ffa500",
+            }
+
+            class Block {
+                constructor(x, y, piece) {
+                    this.x = x;
+                    this.y = y;
+                    this.piece = piece;
+                }
+                draw() {
+                    if (!this.piece) {
+                        return;
+                    }
+                    ctx.fillStyle = this.piece.color;
+                    ctx.fillRect(
+                        this.x * blockSize,
+                        this.y * blockSize,
+                        blockSize,
+                        blockSize,
+                    );
+                }
+            }
+
+            //#region Pieces
+            
+            class Piece {
+                rotationIndex = 0;
+                rotations = [];
+                shape = this.rotations[this.rotationIndex];
+                constructor(color) {
+                    this.color = color;
+                    this.x = Math.floor(cols / 2) - 1;
+                    this.y = 0;
+                }
+                rotate(dir = "clockwise") {
+                    if (dir === "clockwise") {
+                        this.rotationIndex =
+                            (this.rotationIndex + 1) % this.rotations.length;
+                    } else {
+                        this.rotationIndex =
+                            (this.rotationIndex - 1 + this.rotations.length) %
+                            this.rotations.length;
+                    }
+                    this.shape = this.rotations[this.rotationIndex];
+                }
+            }
+
+            class IPiece extends Piece {
+                constructor() {
+                    super(colors.cyan);
+                    this.rotations = [
+                        [
+                            [0, 0, 0, 0],
+                            [1, 1, 1, 1],
+                            [0, 0, 0, 0],
+                            [0, 0, 0, 0],
+                        ],
+                        [
+                            [0, 1, 0, 0],
+                            [0, 1, 0, 0],
+                            [0, 1, 0, 0],
+                            [0, 1, 0, 0],
+                        ],
+                    ];
+                    this.shape = this.rotations[this.rotationIndex];
+                }
+            }
+
+            class OPiece extends Piece {
+                constructor() {
+                    super(colors.yellow);
+                    this.rotations = [
+                        [
+                            [1, 1],
+                            [1, 1],
+                        ],
+                    ];
+                    this.shape = this.rotations[this.rotationIndex];
+                }
+            }
+
+            class TPiece extends Piece {
+                constructor() {
+                    super(colors.purple);
+                    this.rotations = [
+                        [
+                            [0, 1, 0],
+                            [1, 1, 1],
+                            [0, 0, 0],
+                        ],
+                        [
+                            [0, 1, 0],
+                            [0, 1, 1],
+                            [0, 1, 0],
+                        ],
+                        [
+                            [0, 0, 0],
+                            [1, 1, 1],
+                            [0, 1, 0],
+                        ],
+                        [
+                            [0, 1, 0],
+                            [1, 1, 0],
+                            [0, 1, 0],
+                        ],
+                    ];
+                    this.shape = this.rotations[this.rotationIndex];
+                }
+            }
+
+            class SPiece extends Piece {
+                constructor() {
+                    super(colors.green);
+                    this.rotations = [
+                        [
+                            [0, 1, 1],
+                            [1, 1, 0],
+                            [0, 0, 0],
+                        ],
+                        [
+                            [0, 1, 0],
+                            [0, 1, 1],
+                            [0, 0, 1],
+                        ],
+                    ];
+                    this.shape = this.rotations[this.rotationIndex];
+                }
+            }
+            
+            class ZPiece extends Piece {
+                constructor() {
+                    super(colors.red);
+                    this.rotations = [
+                        [
+                            [1, 1, 0],
+                            [0, 1, 1],
+                            [0, 0, 0],
+                        ],
+                        [
+                            [0, 0, 1],
+                            [0, 1, 1],
+                            [0, 1, 0],
+                        ],
+                    ];
+                    this.shape = this.rotations[this.rotationIndex];
+                }
+            }
+
+            class JPiece extends Piece {
+                constructor() {
+                    super(colors.blue);
+                    this.rotations = [
+                        [
+                            [1, 0, 0],
+                            [1, 1, 1],
+                            [0, 0, 0],
+                        ],
+                        [
+                            [0, 1, 1],
+                            [0, 1, 0],
+                            [0, 1, 0],
+                        ],
+                        [
+                            [0, 0, 0],
+                            [1, 1, 1],
+                            [0, 0, 1],
+                        ],
+                        [
+                            [0, 1, 0],
+                            [0, 1, 0],
+                            [1, 1, 0],
+                        ],
+                    ];
+                    this.shape = this.rotations[this.rotationIndex];
+                }
+            }
+
+            class LPiece extends Piece {
+                constructor() {
+                    super(colors.orange);
+                    this.rotations = [
+                        [
+                            [0, 0, 1],
+                            [1, 1, 1],
+                            [0, 0, 0],
+                        ],
+                        [
+                            [0, 1, 0],
+                            [0, 1, 0],
+                            [0, 1, 1],
+                        ],
+                        [
+                            [0, 0, 0],
+                            [1, 1, 1],
+                            [1, 0, 0],
+                        ],
+                        [
+                            [1, 1, 0],
+                            [0, 1, 0],
+                            [0, 1, 0],
+                        ],
+                    ];
+                    this.shape = this.rotations[this.rotationIndex];
+                }
+            }
+            
+
+            /**
+             * @type {Array<typeof Piece>}
+             */
+            const pieces = [IPiece, OPiece, TPiece, SPiece, ZPiece, JPiece, LPiece];
+
+            //#endregion
+
+            //#region Game Logic
+
+            // Fill grid with empty blocks
+            const grid = Array.from({ length: rows }, (_, row) =>
+                Array.from(
+                    { length: cols },
+                    (_, col) => new Block(col, row, null),
+                ),
+            );
+            
+
+            const maxLastPieces = 12;
+            const maxRepeatedPieces = 2;
+            let lastPieces = [];
+
+            let currentPiece = null;
+            let nextPiece = spawnPiece();
+            let dropInterval = 1000;
+            let score = 0;
+            let highScore = parseInt(localStorage.getItem("fallingBlocksHighScore")) || 0;
+            let clearedLines = 0;
+            
+
+            function updateDropInterval() {
+                dropInterval = Math.max(100, 1000 - Math.floor(clearedLines / 10) * 100);
+            }
+
+            function getCSSVariableValue(variable) {
+                return getComputedStyle(document.body).getPropertyValue(variable);
+            }
+
+            function trimShape(shape) {
+                let trimmedShape = shape.map((row) => row.slice());
+                while (trimmedShape.length > 0 && trimmedShape[0].every((cell) => cell === 0)) {
+                    trimmedShape.shift();
+                }
+                while (trimmedShape.length > 0 && trimmedShape[trimmedShape.length - 1].every((cell) => cell === 0)) {
+                    trimmedShape.pop();
+                }
+                return trimmedShape;
+            }
+
+            function draw() {
+                ctx.strokeStyle = getCSSVariableValue("--bg-2");
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                for (const row of grid) {
+                    for (const block of row) {
+                        block.draw();
+                    }
+                }
+                // Draw grid lines
+                ctx.beginPath();
+                for (let r = 0; r <= rows; r++) {
+                    ctx.moveTo(0, r * blockSize);
+                    ctx.lineTo(canvas.width, r * blockSize);
+                }
+                for (let c = 0; c <= cols; c++) {
+                    ctx.moveTo(c * blockSize, 0);
+                    ctx.lineTo(c * blockSize, canvas.height);
+                }
+                ctx.stroke();
+                ctx.closePath();
+                if (currentPiece) {
+                    // Draw drop hint
+                    ctx.beginPath();
+                    ctx.strokeStyle = getCSSVariableValue("--fg-3");
+                    // Find the left and right edges of the piece
+                    let trimmedShape = trimShape(currentPiece.shape);
+                    let leftEdge = Infinity;
+                    let rightEdge = -Infinity;
+                    for (let row = 0; row < trimmedShape.length; row++) {
+                        for (let col = 0; col < trimmedShape[row].length; col++) {
+                            if (trimmedShape[row][col]) {
+                                leftEdge = Math.min(leftEdge, currentPiece.x + col);
+                                rightEdge = Math.max(rightEdge, currentPiece.x + col);
+                            }
+                        }
+                    }
+                    ctx.moveTo(leftEdge * blockSize, 0);
+                    ctx.lineTo(leftEdge * blockSize, canvas.height);
+                    ctx.moveTo((rightEdge + 1) * blockSize, 0);
+                    ctx.lineTo((rightEdge + 1) * blockSize, canvas.height);
+                    ctx.stroke();
+                    
+                }
+                // Draw next piece centered in the canvas
+                nextPieceCtx.clearRect(0, 0, nextPieceCanvas.width, nextPieceCanvas.height);
+                const nextPieceShape = trimShape(nextPiece.shape);
+                const nextPieceWidth = nextPieceShape[0].length;
+                for (let row = 0; row < nextPieceShape.length; row++) {
+                    for (let col = 0; col < nextPieceShape[row].length; col++) {
+                        if (nextPieceShape[row][col]) {
+                            nextPieceCtx.fillStyle = nextPiece.color;
+                            const x = col * blockSize + (nextPieceCanvas.width - nextPieceWidth * blockSize) / 2;
+                            const y = row * blockSize + (nextPieceCanvas.height - nextPieceShape.length * blockSize) / 2;
+                            nextPieceCtx.fillRect(x, y, blockSize, blockSize);
+                        }
+                    }
+                }
+                requestAnimationFrame(draw);
+            }
+            draw();
+
+            function spawnPiece() {
+                let pieceClass = pieces[Math.floor(Math.random() * pieces.length)];
+                while (
+                    lastPieces.filter((p) => p === pieceClass).length >=
+                    maxRepeatedPieces
+                ) {
+                    pieceClass = pieces[Math.floor(Math.random() * pieces.length)];
+                }
+
+                lastPieces.push(pieceClass);
+                if (lastPieces.length > maxRepeatedPieces) {
+                    lastPieces.shift();
+                }
+
+                return new pieceClass();
+            }
+
+            function isCollision(piece) {
+                for (let row = 0; row < piece.shape.length; row++) {
+                    for (let col = 0; col < piece.shape[row].length; col++) {
+                        if (piece.shape[row][col]) {
+                            const x = piece.x + col;
+                            const y = piece.y + row;
+                            if (
+                                x < 0 ||
+                                x >= cols ||
+                                y >= rows ||
+                                (y >= 0 && grid[y][x].piece !== null && grid[y][x].piece !== piece)
+                            ) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                return false;
+            }
+
+            function updateGrid(piece) {
+                // Clear the grid of the current piece
+                for (let row = 0; row < rows; row++) {
+                    for (let col = 0; col < cols; col++) {
+                        if (grid[row][col].piece === piece) {
+                            grid[row][col].piece = null;
+                        }
+                    }
+                }
+                for (let row = 0; row < piece.shape.length; row++) {
+                    for (let col = 0; col < piece.shape[row].length; col++) {
+                        if (piece.shape[row][col]) {
+                            const x = piece.x + col;
+                            const y = piece.y + row;
+                            if (y >= 0 && y < rows && x >= 0 && x < cols) {
+                                grid[y][x].piece = piece;
+                            }
+                        }
+                    }
+                }
+            }
+
+            function movePiece(piece, dx, dy) {
+                piece.x += dx;
+                piece.y += dy;
+                if (isCollision(piece)) {
+                    piece.x -= dx;
+                    piece.y -= dy;
+                    return false;
+                }
+                updateGrid(piece);
+                return true;
+            }
+
+            function rotatePiece(piece, dir) {
+                piece.rotate(dir);
+                if (isCollision(piece)) {
+                    // Try wall kicks
+                    const kicks = [
+                        [1, 0],
+                        [-1, 0],
+                        [0, 1],
+                        [0, -1],
+                    ];
+                    for (const [dx, dy] of kicks) {
+                        piece.x += dx;
+                        piece.y += dy;
+                        if (!isCollision(piece)) {
+                            updateGrid(piece);
+                            return true;
+                        }
+                        piece.x -= dx;
+                        piece.y -= dy;
+                    }
+                    piece.rotate(dir === "clockwise" ? "counterclockwise" : "clockwise");
+                    return false;
+                }
+                updateGrid(piece);
+                return true;
+            }
+
+            function updateScore() {
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem("fallingBlocksHighScore", highScore);
+                }
+                const scoreElement = document.getElementById("score");
+                scoreElement.innerHTML = `Score: ${score}<br>High Score: ${highScore}<br>Cleared Lines: ${clearedLines}`;
+            }
+
+            updateScore();
+
+            function clearLines() {
+                for (let row = rows - 1; row >= 0; row--) {
+                    if (grid[row].every((block) => block.piece !== null)) {
+                        for (let r = row; r > 0; r--) {
+                            for (let c = 0; c < cols; c++) {
+                                grid[r][c].piece = grid[r - 1][c].piece;
+                            }
+                        }
+                        for (let c = 0; c < cols; c++) {
+                            grid[0][c].piece = null;
+                            clearedLines++;
+                            score += 100;
+                            updateScore();
+                        }
+                        row++;
+                    }
+                }
+            }
+
+            function resetGame() {
+                for (let row = 0; row < rows; row++) {
+                    for (let col = 0; col < cols; col++) {
+                        grid[row][col].piece = null;
+                    }
+                }
+                currentPiece = null;
+                nextPiece = spawnPiece();
+                lastPieces = [];
+            }
+
+            function gameLoop() {
+                if (canvas.focused === false) {
+                    setTimeout(gameLoop, dropInterval);
+                    return;
+                }
+                if (!currentPiece) {
+                    currentPiece = nextPiece;
+                    nextPiece = spawnPiece();
+                    console.log("Spawned new piece:", currentPiece);
+                    if (isCollision(currentPiece)) {
+                        alert("Game Over!");
+                        location.reload();
+                        return;
+                    }
+                    updateGrid(currentPiece);
+                } else {
+                    if (!movePiece(currentPiece, 0, 1)) {
+                        currentPiece = null;
+                        clearLines();
+                        return gameLoop();
+                    }
+                }
+                setTimeout(gameLoop, dropInterval);
+            }
+            setTimeout(gameLoop, dropInterval);
+
+            function handleKeyDown(e) {
+                if (!currentPiece) {
+                    return;
+                }
+                function repeatedAction(action) {
+                    action();
+                    const repeatInterval = setInterval(action, 200);
+                    const stopRepeat = () => {
+                        clearInterval(repeatInterval);
+                        document.removeEventListener("keyup", stopRepeat);
+                    };
+                    document.addEventListener("keyup", stopRepeat);
+                }
+                switch (e.code) {
+                    case "KeyA":
+                        repeatedAction(() => movePiece(currentPiece, -1, 0));
+                        break;
+                    case "KeyD":
+                        repeatedAction(() => movePiece(currentPiece, 1, 0));
+                        break;
+                    case "KeyS":
+                        repeatedAction(() => movePiece(currentPiece, 0, 1));
+                        break;
+                    case "KeyQ":
+                        rotatePiece(currentPiece, "counterclockwise");
+                        break;
+                    case "KeyE":
+                        rotatePiece(currentPiece, "clockwise");
+                        break;
+                    case "Space":
+                        while (movePiece(currentPiece, 0, 1)) {
+                            score += 10;
+                            updateScore();
+                        }
+                        break;
+                }
+            }
+            
+            document.addEventListener("keydown", handleKeyDown);
+            //#endregion
+        </script>
+    </body>
+</html>

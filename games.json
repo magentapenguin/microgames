@@ -1,0 +1,19 @@
+{
+    "safe_cracker": {
+        "name": "Safe Cracker",
+        "description": "Crack the safe by guessing the correct combination of numbers. Uses game mechanics from NYT's Wordle.",
+        "file": "safe_cracker.html"
+    },
+    "fall": {
+        "name": "Fall",
+        "description": "Guide the player through holes in floors, while the speed gradually increases.",
+        "file": "fall.html",
+        "highscore_key": "fallHighScore"
+    },
+    "falling_blocks": {
+        "name": "Falling Blocks",
+        "description": "",
+        "file": "falling_blocks.html",
+        "highscore_key": "fallingBlocksHighScore"
+    }
+}

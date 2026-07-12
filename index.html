@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microgames</title>
+    <meta name="description" content="A collection of small browser games.">
+    <meta name="keywords" content="microgames,browser games,small games,fun games">
+    <meta name="author" content="magentapenguin">
+    <style>
+        @import '/static/theme.css';
+        body {
+            margin-inline: clamp(16px, 5vw, 64px);
+            display: flex;
+            flex-direction: column;
+        }
+        .game {
+            border: 1px solid var(--bg-2);
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px;
+            min-width: 180px;
+            max-width: 300px;
+            display: inline-block;
+            vertical-align: top;
+            display: flex;
+            gap: 8px;
+            flex-direction: column;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: box-shadow 0.2s ease, transform 0.2s ease;
+        }
+        .game:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+        }
+        .thumbnail {
+            width: 100%;
+            height: 150px;
+            background-color: var(--color);
+            border-radius: 4px;
+        }
+        .play-button {
+            display: inline-block;
+            padding: 8px 16px;
+            background-color: #1b7438;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            text-align: center;
+            position: relative;
+        }
+        .play-button .icon {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.2em;
+            transition: transform 0.2s ease;
+        }
+        .play-button:hover {
+            filter: brightness(1.1);
+        }
+        .play-button:hover .icon {
+            transform: translateY(-50%) translateX(4px);
+        }
+        .description {
+            font-size: 14px;
+            color: var(--fg-3);
+            margin: 0;
+        }
+        .highscore {
+            margin-block: -4px;
+            font-weight: 500;
+            color: var(--fg-2);
+        }
+        .game h2 {
+            margin-block: 0;
+        }
+        #games {
+            text-align: center;
+            display: grid;
+            margin-inline: 16px;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+            flex: 1;
+        }
+        .icon {
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+            vertical-align: -0.125em;
+        }
+        footer {
+            text-align: center;
+            padding: 16px;
+            font-size: 14px;
+            color: var(--fg-2);
+        }
+    </style>
+    <link rel="icon" href="/static/favicon.ico">
+    <link rel="stylesheet" href="/static/theme-switcher.css">
+    <script src="/static/theme-switcher.js"></script>
+</head>
+<body>
+    <div>
+        <h1>Microgames</h1>
+        <p>A collection of small browser games. Click "Play" to start a game!</p>
+    </div>
+    <div id="games">
+        % for id, game in games.items():
+        <div class="game" id="game-{{ id }}">
+            <div class="thumbnail" style="--color: {{ game['color'] }};">
+                <!-- Placeholder -->
+            </div>
+            <h2>{{ game['name'] }}</h2>
+            <p class="description">
+                {{ game['description'] }}
+            </p>
+            % if game.get('highscore_key'):
+            <p class="description highscore">
+                High Score: <span id="highscore-{{ id }}">Loading...</span>
+            </p>
+            <script>
+                (() => {
+                    const highscoreKey = "{{ game['highscore_key'] }}";
+                    const highscoreElement = document.getElementById("highscore-{{ id }}");
+                    const highscore = localStorage.getItem(highscoreKey);
+                    if (highscore !== null) {
+                        highscoreElement.textContent = highscore;
+                    } else {
+                        highscoreElement.textContent = "0";
+                    }
+                })();
+            </script>
+            % end
+            <div style="flex-grow:1;margin-top:-8px;"></div>
+            <a href="/game/{{ id }}" class="play-button">
+                Play
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="icon">
+                    <path fill-rule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clip-rule="evenodd" />
+                </svg>
+            </a>
+        </div>
+        % end
+    </div>
+    <footer>
+        % import datetime
+        &copy; {{ datetime.datetime.now().year }} magentapenguin | MIT License
+    </footer>
+</body>
+</html>

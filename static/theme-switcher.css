@@ -1,0 +1,16 @@
+#theme-switcher {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    color: var(--fg-1, currentColor);
+}
+[data-theme="light"] {
+    color-scheme: light;
+}
+[data-theme="dark"] {
+    color-scheme: dark;
+}

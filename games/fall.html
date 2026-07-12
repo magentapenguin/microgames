@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fall</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            background: black;
+            color: white;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+    <script src="/static/back.js"></script>
+</head>
+<body>
+    <script type="module">
+        import kaplay from "https://esm.run/kaplay@next";
+        const k = kaplay({
+            background: "#000000",
+            width: 500,
+            height: 500,
+            debugKey: "i",
+            pixelDensity: 2,
+            crisp: true,
+            buttons: {
+                left: {
+                    keyboard: ["left", "a"],
+                },
+                right: {
+                    keyboard: ["right", "d"],
+                },
+                down: {
+                    keyboard: ["down", "s"],
+                },
+            }
+        });
+
+        k.scene("menu", ()=>{
+            const title = k.add([
+                k.color(k.WHITE),
+                k.text("Fall"),
+                k.pos(k.width()/2, k.height()/2),
+                k.anchor("center"),
+                k.area(),
+                k.scale(),
+                k.body({ isStatic: true }),
+            ])
+            title.scaleTo(1)
+            title.onUpdate(()=>{
+                title.pos.y = k.height()/2 + k.wave(-8, 8, k.time() * 0.5)
+            });
+            title.onClick(()=>{
+                k.setCursor("default")
+                k.go("game")
+            })
+            title.onHover(()=>{
+                title.scaleTo(1.2)
+                k.setCursor("pointer")
+            })
+            title.onHoverEnd(()=>{
+                title.scaleTo(1)
+                k.setCursor("default")
+            })
+            const highScoreText = k.add([
+                k.color(k.rgb(128,128,128)),
+                k.text("High Score: " + highScore, {
+                    size: 20,
+                }),
+                k.pos(k.width()/2, k.height() - 50),
+                k.anchor("center"),
+                k.area(),
+                k.body({ isStatic: true }),
+            ])
+            highScoreText.onUpdate(()=>{
+                highScoreText.pos.y = k.height() - 50 + k.wave(-5, 5, k.time() * 0.25 + 20)
+            });
+        })
+        k.setGravity(500)
+        let highScore = parseInt(localStorage.getItem("fallHighScore") ?? "0") ?? 0
+
+        let colors = []
+        for (let i = 0; i < 360; i+=30) {
+            colors.push(k.hsl2rgb(i/360, 1, 0.5))
+        }
+        let colorIndex = 0;
+        k.scene("game", ()=>{
+            let score = 0;
+            let offset = 0;
+            const scoreText = k.add([
+                k.color("#888888"),
+                k.text(score),
+                k.pos(10, 10),
+                k.fixed()
+            ])
+            const player = k.add([
+                k.rect(15, 15),
+                k.color(k.WHITE),
+                k.pos(k.width()/2, 50),
+                k.anchor("center"),
+                k.area({
+                    friction: 0,
+                }),
+                k.body({
+                    dampening: 0,
+                }),
+                k.timer(),
+                "player",
+            ])
+            k.add([
+                k.color(k.WHITE),
+                k.rect(k.width(), 10),
+                k.pos(0, k.height()),
+                k.anchor("topleft"),
+                k.area(),
+                k.body({ isStatic: true }),
+                "ground",
+            ])
+            k.add([
+                k.color(k.WHITE),
+                k.rect(10, k.height()),
+                k.pos(0, 0),
+                k.anchor("topright"),
+                k.area(),
+                k.body({ isStatic: true }),
+                "wall",
+            ])
+            k.add([
+                k.color(k.WHITE),
+                k.rect(10, k.height()),
+                k.pos(k.width(), 0),
+                k.anchor("topleft"),
+                k.area(),
+                k.body({ isStatic: true }),
+                "wall",
+            ])
+            k.onUpdate(()=>{
+                if (player.pos.x < 0) {
+                    player.pos.x = 0
+                }
+                if (player.pos.x > k.width()) {
+                    player.pos.x = k.width()
+                }
+                if (player.pos.y < 0) {
+                    if (score > highScore) {
+                        highScore = score
+                    }
+                    localStorage.setItem("fallHighScore", highScore)
+                    k.go("menu")
+                }
+            })
+            player.onButtonDown("down", ()=>{
+                if (!player.isGrounded()) {
+                    player.addForce(k.vec2(0,1000))
+                }
+                player.friction = 0.98
+            })
+            player.onButtonRelease("down", ()=>{
+                player.friction = 0
+            })
+            player.onButtonDown("left", ()=>{
+                player.addForce(k.vec2(-800, 0))
+            })
+            player.onButtonDown("right", ()=>{
+                player.addForce(k.vec2(800, 0))
+            })
+
+            function spawn() {
+                const holeX = k.rand(20, k.width()-20)
+                const width = 35; // Hole width
+                const height = 8;
+                const startY = offset + k.height() + 5
+                const color = colors[colorIndex]
+                colorIndex = (colorIndex + 1) % colors.length
+                const blockLeft = k.add([
+                    k.rect(holeX - width/2, height),
+                    k.color(color),
+                    k.pos(0, k.height() + 5),
+                    k.anchor("left"),
+                    k.area(),
+                    k.body({ isStatic: true }),
+                    "block",
+                ])
+                const blockRight = k.add([
+                    k.rect(k.width() - holeX - width/2, height),
+                    k.color(color),
+                    k.pos(k.width(), k.height() + 5),
+                    k.anchor("right"),
+                    k.area(),
+                    k.body({ isStatic: true }),
+                    "block",
+                ])
+                let passed = false;
+                blockLeft.onUpdate(()=>{
+                    if (blockLeft.pos.y < -height) {
+                        blockLeft.destroy()
+                        blockRight.destroy()
+                    }
+                    if (player.pos.y > blockLeft.pos.y + height && !passed) {
+                        passed = true;
+                        score++
+                        scoreText.text = score
+                    }
+                    blockLeft.pos.y = startY - offset
+                    blockRight.pos.y = startY - offset
+                })
+            }
+            spawn()
+            let lastSpawn = 0
+            player.onUpdate(()=>{
+                offset += (score / 80 + 1.5) * k.dt() * 60
+                if (offset - lastSpawn > 80) {
+                    spawn()
+                    lastSpawn = offset
+                }
+            })
+        })
+
+        k.go("menu")
+    </script>
+</body>
+</html>
