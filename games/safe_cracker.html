@@ -99,7 +99,8 @@
             <div id="current-guess"></div>
         </div>
         <div id="guessed"></div>
-        <script>
+        <script type="module">
+            import { wait, playFrequency, getAudioContext } from "/microgames/static/sound.js";
             const keypad = document.getElementById("keypad");
             const currentGuess = document.getElementById("current-guess");
             let length = 2;
@@ -249,7 +250,7 @@
                 return button;
             }
 
-            const context = new AudioContext();
+            const context = getAudioContext();
             
             function playTick() {
                 const oscillator = context.createOscillator();
@@ -265,34 +266,6 @@
                 setTimeout(() => {
                     oscillator.stop();
                 }, 100);
-            }
-
-            function playFrequency(frequency, time = 100, volume = 0.1) {
-                return new Promise((resolve) => {
-                    const oscillator = context.createOscillator();
-                    oscillator.type = "square";
-                    oscillator.frequency.setValueAtTime(
-                        frequency,
-                        context.currentTime
-                    );
-                    const gain = context.createGain();
-                    gain.gain.setValueAtTime(volume, context.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(
-                        0.001,
-                        context.currentTime + time / 1000
-                    );
-                    oscillator.connect(gain);
-                    gain.connect(context.destination);
-                    oscillator.start();
-                    setTimeout(() => {
-                        oscillator.stop();
-                        resolve();
-                    }, time);
-                });
-            }
-
-            function wait(ms) {
-                return new Promise((resolve) => setTimeout(resolve, ms));
             }
 
             async function playCorrect() {

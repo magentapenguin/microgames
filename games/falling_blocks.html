@@ -7,7 +7,6 @@
         <link rel="stylesheet" href="/microgames/static/theme-switcher.css" />
         <script src="/microgames/static/theme-switcher.js"></script>
         <style>
-            @import "/microgames/static/fonts/inter.css";
             @import "/microgames/static/theme.css";
             body {
                 margin: 0;
@@ -42,8 +41,51 @@
                 border: 1px solid var(--bg-2);
                 margin: 8px 0;
             }
+            #menu {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background-color: var(--bg-1);
+                border: 1px solid var(--bg-2);
+                padding: 1rem;
+                border-radius: 8px;
+                min-width: 200px;
+            }
+            #menu p {
+                margin: 0;
+            }
+            #menu-title {
+                margin: 0 0 8px 0;
+                text-align: center;
+            }
+            #menu-content {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 8px;
+            }
+            #buttons {
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+                width: 100%;
+                align-items: stretch;
+            }
+            button {
+                padding: 8px 16px;
+                background-color: var(--bg-2);
+                color: var(--fg-1);
+                border: none;
+                cursor: pointer;
+                display: block;
+                font: inherit;
+                font-size: 0.9em;
+            }
+            button:hover {
+                background-color: var(--bg-3);
+            }
         </style>
-        <script src="/microgames/static/back.js"></script>
     </head>
     <body>
         <div id="info">
@@ -55,8 +97,12 @@
             </div>
         </div>
         <canvas id="gameCanvas"></canvas>
-        
+        <div id="menu" hidden>
+            <h2 id="menu-title"></h2>
+            <div id="menu-content"></div>
+        </div>
         <script type="module">
+            import { wait, playFrequency, getAudioContext } from "/microgames/static/sound.js";
             /**
              * @type {HTMLCanvasElement}
              */
@@ -68,6 +114,14 @@
 
             const nextPieceCanvas = document.getElementById("nextPieceCanvas");
             const nextPieceCtx = nextPieceCanvas.getContext("2d");
+            if (!nextPieceCtx) {
+                throw new Error("Failed to get next piece canvas context");
+            }
+
+            
+            const menu = document.getElementById("menu");
+            const menuTitle = document.getElementById("menu-title");
+            const menuContent = document.getElementById("menu-content");
 
             const rows = 20;
             const cols = 10;
@@ -93,17 +147,19 @@
                     this.y = y;
                     this.piece = piece;
                 }
-                draw() {
+                draw(drawTarget = ctx) {
                     if (!this.piece) {
                         return;
                     }
-                    ctx.fillStyle = this.piece.color;
-                    ctx.fillRect(
+                    drawTarget.fillStyle = this.piece.color;
+                    drawTarget.fillRect(
                         this.x * blockSize,
                         this.y * blockSize,
-                        blockSize,
-                        blockSize,
+                        blockSize - 1,
+                        blockSize - 1,
                     );
+                    // Highlight the edge of the block
+
                 }
             }
 
@@ -128,6 +184,16 @@
                             this.rotations.length;
                     }
                     this.shape = this.rotations[this.rotationIndex];
+                }
+                draw(target, x, y) {
+                    for (let row = 0; row < this.shape.length; row++) {
+                        for (let col = 0; col < this.shape[row].length; col++) {
+                            if (this.shape[row][col]) {
+                                const block = new Block(x + col, y + row, this);
+                                block.draw(target);
+                            }
+                        }
+                    }
                 }
             }
 
@@ -319,10 +385,14 @@
             let score = 0;
             let highScore = parseInt(localStorage.getItem("fallingBlocksHighScore")) || 0;
             let clearedLines = 0;
+            let placeLoopId = null;
+
+            let gameState = "menu"; // "menu", "playing", "paused", "gameover"
             
 
             function updateDropInterval() {
-                dropInterval = Math.max(100, 1000 - Math.floor(clearedLines / 10) * 100);
+                dropInterval = Math.max(50, 1000 - Math.floor(clearedLines / 50) * 100);
+                console.log("Drop interval updated to:", dropInterval);
             }
 
             function getCSSVariableValue(variable) {
@@ -361,42 +431,26 @@
                 ctx.stroke();
                 ctx.closePath();
                 if (currentPiece) {
-                    // Draw drop hint
-                    ctx.beginPath();
-                    ctx.strokeStyle = getCSSVariableValue("--fg-3");
-                    // Find the left and right edges of the piece
-                    let trimmedShape = trimShape(currentPiece.shape);
-                    let leftEdge = Infinity;
-                    let rightEdge = -Infinity;
-                    for (let row = 0; row < trimmedShape.length; row++) {
-                        for (let col = 0; col < trimmedShape[row].length; col++) {
-                            if (trimmedShape[row][col]) {
-                                leftEdge = Math.min(leftEdge, currentPiece.x + col);
-                                rightEdge = Math.max(rightEdge, currentPiece.x + col);
-                            }
-                        }
+                    // Draw drop preview
+                    const previewPiece = new currentPiece.constructor();
+                    previewPiece.x = currentPiece.x;
+                    previewPiece.y = currentPiece.y;
+                    previewPiece.shape = currentPiece.shape;
+                    while (!isCollision(previewPiece, currentPiece)) {
+                        previewPiece.y++;
                     }
-                    ctx.moveTo(leftEdge * blockSize, 0);
-                    ctx.lineTo(leftEdge * blockSize, canvas.height);
-                    ctx.moveTo((rightEdge + 1) * blockSize, 0);
-                    ctx.lineTo((rightEdge + 1) * blockSize, canvas.height);
-                    ctx.stroke();
-                    
+                    previewPiece.y--;
+                    ctx.globalAlpha = 0.3;
+                    previewPiece.draw(ctx, previewPiece.x, previewPiece.y);
+                    ctx.globalAlpha = 1.0;
                 }
                 // Draw next piece centered in the canvas
                 nextPieceCtx.clearRect(0, 0, nextPieceCanvas.width, nextPieceCanvas.height);
                 const nextPieceShape = trimShape(nextPiece.shape);
                 const nextPieceWidth = nextPieceShape[0].length;
-                for (let row = 0; row < nextPieceShape.length; row++) {
-                    for (let col = 0; col < nextPieceShape[row].length; col++) {
-                        if (nextPieceShape[row][col]) {
-                            nextPieceCtx.fillStyle = nextPiece.color;
-                            const x = col * blockSize + (nextPieceCanvas.width - nextPieceWidth * blockSize) / 2;
-                            const y = row * blockSize + (nextPieceCanvas.height - nextPieceShape.length * blockSize) / 2;
-                            nextPieceCtx.fillRect(x, y, blockSize, blockSize);
-                        }
-                    }
-                }
+                // Draw the next piece with Block objects
+                nextPiece.draw(nextPieceCtx, (4 - nextPieceWidth) / 2, (4 - nextPieceShape.length) / 2);
+
                 requestAnimationFrame(draw);
             }
             draw();
@@ -418,7 +472,7 @@
                 return new pieceClass();
             }
 
-            function isCollision(piece) {
+            function isCollision(piece, ignoredPiece = null) {
                 for (let row = 0; row < piece.shape.length; row++) {
                     for (let col = 0; col < piece.shape[row].length; col++) {
                         if (piece.shape[row][col]) {
@@ -428,7 +482,7 @@
                                 x < 0 ||
                                 x >= cols ||
                                 y >= rows ||
-                                (y >= 0 && grid[y][x].piece !== null && grid[y][x].piece !== piece)
+                                (y >= 0 && grid[y][x].piece !== null && grid[y][x].piece !== piece && grid[y][x].piece !== ignoredPiece)
                             ) {
                                 return true;
                             }
@@ -460,7 +514,7 @@
                 }
             }
 
-            function movePiece(piece, dx, dy) {
+            function movePiece(piece, dx, dy, update = true) {
                 piece.x += dx;
                 piece.y += dy;
                 if (isCollision(piece)) {
@@ -468,7 +522,9 @@
                     piece.y -= dy;
                     return false;
                 }
-                updateGrid(piece);
+                if (update) {
+                    updateGrid(piece);
+                }
                 return true;
             }
 
@@ -511,6 +567,7 @@
             updateScore();
 
             function clearLines() {
+                let linesCleared = 0;
                 for (let row = rows - 1; row >= 0; row--) {
                     if (grid[row].every((block) => block.piece !== null)) {
                         for (let r = row; r > 0; r--) {
@@ -520,6 +577,7 @@
                         }
                         for (let c = 0; c < cols; c++) {
                             grid[0][c].piece = null;
+                            linesCleared++;
                             clearedLines++;
                             score += 100;
                             updateScore();
@@ -527,6 +585,8 @@
                         row++;
                     }
                 }
+                score += (linesCleared - 1) * linesCleared * 50;
+                updateDropInterval();
             }
 
             function resetGame() {
@@ -538,41 +598,172 @@
                 currentPiece = null;
                 nextPiece = spawnPiece();
                 lastPieces = [];
+                score = 0;
+                clearedLines = 0;
+                updateScore();
+                gameState = "playing";
             }
 
-            function gameLoop() {
-                if (canvas.focused === false) {
-                    setTimeout(gameLoop, dropInterval);
+            function mainMenu() {
+                resetGame();
+                gameState = "menu";
+                menuTitle.textContent = "Falling Block Game";
+                menuContent.innerHTML = `
+                <div id="buttons">
+                    <button id="startButton">Start Game</button>
+                    <button id="backButton">Back</button>
+                </div>
+                `;
+                menu.hidden = false;
+                document.getElementById("startButton").addEventListener("click", () => {
+                    startGame();
+                });
+                document.getElementById("backButton").addEventListener("click", () => {
+                    window.location.href = "/microgames";
+                });
+            }
+
+            function gameOver() {
+                async function playGameOverSound() {
+                    const frequencies = [440, 330, 220];
+                    for (const freq of frequencies) {
+                        await playFrequency(freq, 200, 0.1, "square");
+                        await wait(100);
+                    }
+                }
+                playGameOverSound();
+                gameState = "gameover";
+                currentPiece = null;
+                if (placeLoopId) {
+                    clearTimeout(placeLoopId);
+                    placeLoopId = null;
+                }
+                updateScore();
+                menuTitle.textContent = "Game Over";
+                menuContent.innerHTML = `
+                    <p>Your score: ${score}</p>
+                    <p>High score: ${highScore}</p>
+                <div id="buttons">
+                    <button id="restartButton">Restart</button>
+                    <button id="backButton">Menu</button>
+                </div>
+                `;
+                menu.hidden = false;
+                document.getElementById("restartButton").addEventListener("click", () => {
+                    startGame();
+                });
+                document.getElementById("backButton").addEventListener("click", () => {
+                    mainMenu();
+                });
+            }
+            
+            function startGame() {
+                resetGame();
+                spawnNextPiece();
+                menu.hidden = true;
+                dropLoop();
+                placeLoop();
+            }
+
+            function pauseGame() {
+                gameState = "paused";
+                menuTitle.textContent = "Paused";
+                menuContent.innerHTML = `
+                <div id="buttons">
+                    <button id="resumeButton">Resume</button>
+                    <button id="restartButton">Restart</button>
+                    <button id="backButton">Menu</button>
+                </div>
+                `;
+                menu.hidden = false;
+                document.getElementById("resumeButton").addEventListener("click", () => {
+                    gameState = "playing";
+                    menu.hidden = true;
+                    if (!placeLoopId) {
+                        placeLoopId = setTimeout(placeLoop, 1000);
+                    }
+                });
+                document.getElementById("backButton").addEventListener("click", () => {
+                    mainMenu();
+                });
+                document.getElementById("restartButton").addEventListener("click", () => {
+                    startGame();
+                });
+            }
+
+            function spawnNextPiece() {
+                currentPiece = nextPiece;
+                nextPiece = spawnPiece();
+                if (isCollision(currentPiece)) {
+                    gameOver();
+                    return false;
+                }
+                updateGrid(currentPiece);
+                return true;
+            }
+
+            function tryPlaceCurrentPiece() {
+                if (!currentPiece) {
+                    return false;
+                }
+                if (movePiece(currentPiece, 0, 1, false)) {
+                    movePiece(currentPiece, 0, -1, false);
+                    return false;
+                } else {
+                    clearLines();
+                    currentPiece = null;
+                    playFrequency(110, 100, 0.1, "square");
+                    return spawnNextPiece();
+                }
+            }
+
+            function dropLoop() {
+                if (gameState !== "playing") {
                     return;
                 }
-                if (!currentPiece) {
-                    currentPiece = nextPiece;
-                    nextPiece = spawnPiece();
-                    console.log("Spawned new piece:", currentPiece);
-                    if (isCollision(currentPiece)) {
-                        alert("Game Over!");
-                        location.reload();
-                        return;
+                console.log("Dropping piece");
+                if (currentPiece) {
+                    if (placeLoopId) {
+                        clearTimeout(placeLoopId);
+                        placeLoopId = null;
                     }
-                    updateGrid(currentPiece);
-                } else {
-                    if (!movePiece(currentPiece, 0, 1)) {
-                        currentPiece = null;
-                        clearLines();
-                        return gameLoop();
-                    }
+                    movePiece(currentPiece, 0, 1);
+                    playFrequency(330, 100, 0.1, "square");
+                    placeLoopId = setTimeout(placeLoop, 1000);
                 }
-                setTimeout(gameLoop, dropInterval);
+                setTimeout(dropLoop, dropInterval);
             }
-            setTimeout(gameLoop, dropInterval);
+
+            function placeLoop() {
+                if (gameState !== "playing") {
+                    return;
+                }
+                if (currentPiece) {
+                    tryPlaceCurrentPiece();
+                }
+                placeLoopId = setTimeout(placeLoop, 1000);
+            }
+
+            mainMenu();
 
             function handleKeyDown(e) {
+                console.log("Key pressed:", e.code);
+                switch (e.code) {
+                    case "Escape":
+                        if (gameState === "playing") {
+                            pauseGame();
+                        } else if (gameState === "paused") {
+                            gameState = "playing";
+                            menu.hidden = true;
+                        }
+                        break;
+                }
                 if (!currentPiece) {
                     return;
                 }
                 function repeatedAction(action) {
                     action();
-                    const repeatInterval = setInterval(action, 200);
+                    const repeatInterval = setInterval(action, 100);
                     const stopRepeat = () => {
                         clearInterval(repeatInterval);
                         document.removeEventListener("keyup", stopRepeat);
@@ -587,7 +778,16 @@
                         repeatedAction(() => movePiece(currentPiece, 1, 0));
                         break;
                     case "KeyS":
-                        repeatedAction(() => movePiece(currentPiece, 0, 1));
+                        repeatedAction(() => {
+                            if (placeLoopId) {
+                                clearTimeout(placeLoopId);
+                                placeLoopId = null;
+                            }
+                            movePiece(currentPiece, 0, 1);
+                            playFrequency(330, 100, 0.1, "square");
+                            tryPlaceCurrentPiece();
+                            placeLoopId = setTimeout(placeLoop, 1000);
+                        });
                         break;
                     case "KeyQ":
                         rotatePiece(currentPiece, "counterclockwise");
@@ -599,12 +799,29 @@
                         while (movePiece(currentPiece, 0, 1)) {
                             score += 10;
                             updateScore();
+                            if (placeLoopId) {
+                                clearTimeout(placeLoopId);
+                            }
+                            placeLoopId = setTimeout(placeLoop, 1000);
                         }
                         break;
                 }
             }
-            
-            document.addEventListener("keydown", handleKeyDown);
+            let keysPressed = new Set();
+            document.addEventListener("keydown", (e) => {
+                if (!keysPressed.has(e.code)) {
+                    keysPressed.add(e.code);
+                    handleKeyDown(e);
+                }
+            });
+            document.addEventListener("keyup", (e) => {
+                keysPressed.delete(e.code);
+            });
+            canvas.addEventListener("blur", () => {
+                if (gameState === "playing") {
+                    pauseGame();
+                }
+            });
             //#endregion
         </script>
     </body>
