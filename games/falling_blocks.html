@@ -386,6 +386,7 @@
             let highScore = parseInt(localStorage.getItem("fallingBlocksHighScore")) || 0;
             let clearedLines = 0;
             let placeLoopId = null;
+            let dropLoopId = null;
 
             let gameState = "menu"; // "menu", "playing", "paused", "gameover"
             
@@ -661,8 +662,14 @@
                 resetGame();
                 spawnNextPiece();
                 menu.hidden = true;
-                dropLoop();
-                placeLoop();
+                if (dropLoopId) {
+                    clearTimeout(dropLoopId);
+                }
+                dropLoopId = setTimeout(dropLoop, dropInterval);
+                if (placeLoopId) {
+                    clearTimeout(placeLoopId);
+                }
+                placeLoopId = setTimeout(placeLoop, 1000);
             }
 
             function pauseGame() {
@@ -681,6 +688,9 @@
                     menu.hidden = true;
                     if (!placeLoopId) {
                         placeLoopId = setTimeout(placeLoop, 1000);
+                    }
+                    if (!dropLoopId) {
+                        dropLoopId = setTimeout(dropLoop, dropInterval);
                     }
                 });
                 document.getElementById("backButton").addEventListener("click", () => {
@@ -719,23 +729,24 @@
 
             function dropLoop() {
                 if (gameState !== "playing") {
+                    dropLoopId = null;
                     return;
                 }
                 console.log("Dropping piece");
                 if (currentPiece) {
                     if (placeLoopId) {
                         clearTimeout(placeLoopId);
-                        placeLoopId = null;
                     }
                     movePiece(currentPiece, 0, 1);
                     playFrequency(330, 100, 0.1, "square");
                     placeLoopId = setTimeout(placeLoop, 1000);
                 }
-                setTimeout(dropLoop, dropInterval);
+                dropLoopId = setTimeout(dropLoop, dropInterval);
             }
 
             function placeLoop() {
                 if (gameState !== "playing") {
+                    dropLoopId = null;
                     return;
                 }
                 if (currentPiece) {
