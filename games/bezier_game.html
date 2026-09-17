@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bezier Game</title>
+    <title>Fall</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+        background: white;
+        color: black;
+      }
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+    </style>
+    <script src="/microgames/static/back.js"></script>
+  </head>
+
+  <body>
+    <canvas width="600" height="500" id="canvas"></canvas>
+    <script type="module">
+      /** @type {HTMLCanvasElement} */
+      const canvas = document.getElementById("canvas");
+      /** @type {CanvasRenderingContext2D} */
+      const ctx = canvas.getContext("2d");
+      const levels = [
+        {
+          start: { x: 100, y: 400 },
+          end: { x: 500, y: 400 },
+          controlPoints: [
+            { x: 200, y: 100 },
+            { x: 400, y: 100 },
+          ],
+        },
+        {
+          start: {
+            x: 100,
+            y: 400,
+            id: 0,
+          },
+          end: {
+            x: 500,
+            y: 220,
+            id: 3,
+          },
+          controlPoints: [
+            {
+              x: 500,
+              y: 400,
+              id: 1,
+            },
+            {
+              x: 100,
+              y: 220,
+              id: 2,
+            },
+          ],
+        },
+        {
+          start: {
+            x: 150,
+            y: 210,
+            id: 0,
+          },
+          end: {
+            x: 360,
+            y: 110,
+            id: 3,
+          },
+          controlPoints: [
+            {
+              x: 360,
+              y: 210,
+              id: 1,
+            },
+            {
+              x: 290,
+              y: 210,
+              id: 2,
+            },
+          ],
+        },
+        {
+          start: { x: 100, y: 300 },
+          end: { x: 600, y: 400 },
+          controlPoints: [
+            { x: 300, y: 100 },
+            { x: 400, y: 500 },
+            { x: 500, y: 200 },
+          ],
+        },
+        {
+          start: {
+            x: 210,
+            y: 110,
+          },
+          end: {
+            x: 465,
+            y: 330,
+          },
+          controlPoints: [
+            {
+              x: 167,
+              y: 278,
+            },
+            {
+              x: 560,
+              y: 38,
+            },
+            {
+              x: 10,
+              y: 480,
+            },
+            {
+              x: 490,
+              y: 470,
+            },
+          ],
+        },
+        {
+          start: {
+            x: 450,
+            y: 344,
+            id: 0,
+          },
+          end: {
+            x: 85,
+            y: 134,
+            id: 5,
+          },
+          controlPoints: [
+            {
+              x: 13,
+              y: 219,
+              id: 1,
+            },
+            {
+              x: 381,
+              y: 66,
+              id: 2,
+            },
+            {
+              x: 413,
+              y: 228,
+              id: 3,
+            },
+            {
+              x: 350,
+              y: 426,
+              id: 4,
+            },
+          ],
+        },
+        {
+          start: {
+            x: 100,
+            y: 400,
+            id: 0,
+          },
+          end: {
+            x: 500,
+            y: 400,
+            id: 3,
+          },
+          controlPoints: [
+            {
+              x: 300,
+              y: 400,
+              id: 1,
+            },
+            {
+              x: 300,
+              y: 170,
+              id: 2,
+            },
+          ],
+        },
+        {
+          start: {
+            x: 100,
+            y: 400,
+            id: 0,
+          },
+          end: {
+            x: 500,
+            y: 170,
+            id: 4,
+          },
+          controlPoints: [
+            {
+              x: 300,
+              y: 400,
+              id: 1,
+            },
+            {
+              x: 300,
+              y: 170,
+              id: 2,
+            },
+            {
+              x: 500,
+              y: 400,
+              id: 3,
+            },
+          ],
+        },
+      ];
+      class LevelCache {
+        constructor(levels) {
+          this.levels = levels;
+          this.cache = new Map();
+        }
+        storeCache() {
+          // TODO: Implement cache storage logic (e.g., localStorage or IndexedDB)
+          // for now, just a noop
+        }
+        loadCache() {
+          // TODO: Implement cache loading logic (e.g., localStorage or IndexedDB)
+          // for now, just a noop
+        }
+        async getLevel(index) {
+          if (this.cache.has(index)) {
+            return this.cache.get(index);
+          } else {
+            if (index >= this.levels.length) {
+              // Generate a random level if the index exceeds predefined levels
+              const randomLevel = generateRandomLevel(index);
+              this.cache.set(index, randomLevel);
+              return randomLevel;
+            }
+            const level = this.levels[index];
+            this.cache.set(index, level);
+            return level;
+          }
+        }
+      }
+      const totalLevels = () => {
+         return Math.max(levels.length, currentLevelIndex + 2);
+      }; // TODO: add level streaming
+      const levelCache = new LevelCache(levels);
+      levelCache.loadCache();
+      let currentLevelIndex = 0;
+      let currentPoints = [];
+      let currentUserPoints = [];
+      let currentDifference = Infinity;
+
+      let gridSnap = false;
+
+      // Options
+      const requiredDifferenceThreshold = 4;
+      const levelCreationMode = false;
+      const canvasPadding = 20;
+      const canvasHeight = 500;
+      const canvasWidth = 600;
+      canvas.width = Math.min(canvasWidth + canvasPadding * 2, window.innerWidth);
+      canvas.height = Math.min(canvasHeight + canvasPadding * 2, window.innerHeight);
+
+      function centerPoint(point) {
+        return {
+          x: point.x + (canvas.width - canvasWidth) / 2,
+          y: point.y + (canvas.height - canvasHeight) / 2,
+          ...point,
+        };
+      }
+      
+      const randomPoint = () => ({
+          x: Math.round(Math.random() * canvasWidth / 10) * 10,
+          y: Math.round(Math.random() * canvasHeight / 10) * 10,
+      });
+
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const lerp2d = (p1, p2, t) => ({
+        x: lerp(p1.x, p2.x, t),
+        y: lerp(p1.y, p2.y, t),
+      });
+
+      function generateRandomLevel(levelIndex) {
+        const map = (value, inMin, inMax, outMin, outMax) => {
+          return (
+            ((value - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin
+          );
+        };
+        const start = randomPoint();
+        const end = randomPoint();
+        // Clamp the start and end points within 1/2 of the canvas width and height
+        start.x = map(start.x, 0, canvasWidth, canvasWidth * 0.25, canvasWidth * 0.75);
+        start.y = map(start.y, 0, canvasHeight, canvasHeight * 0.25, canvasHeight * 0.75);
+        end.x = map(end.x, 0, canvasWidth, canvasWidth * 0.25, canvasWidth * 0.75);
+        end.y = map(end.y, 0, canvasHeight, canvasHeight * 0.25, canvasHeight * 0.75);
+        const controlPoints = [];
+        const numControlPoints = Math.floor(Math.random() * Math.pow(levelIndex + 1, 0.1)) + Math.ceil(Math.pow((levelIndex + 1) / 10, 0.5) + 3);
+        const midPoint = lerp2d(start, end, 0.5);
+        for (let i = 0; i < numControlPoints; i++) {
+          const t = (i + 1) / (numControlPoints + 1);
+          const pointOnLine = lerp2d(start, end, t);
+          const offsetX = (Math.random() - 0.5) * canvasWidth * 0.5;
+          const offsetY = (Math.random() - 0.5) * canvasHeight * 0.5;
+          controlPoints.push(centerPoint({
+            x: pointOnLine.x + offsetX,
+            y: pointOnLine.y + offsetY,
+          }));
+        }
+        return { start, end, controlPoints };
+      }
+
+      async function startLevel(index) {
+        currentLevelIndex = index;
+        const level = await levelCache.getLevel(index);
+        currentPoints = [level.start, ...level.controlPoints, level.end];
+        // Scramble the control points for user input
+        currentUserPoints = [];
+        for (let i = 0; i < currentPoints.length; i++) {
+          currentUserPoints.push({ ...randomPoint(), id: i });
+        }
+        // Prefetch the next level if it exists
+        if (index + 1 < totalLevels()) {
+          levelCache.getLevel(index + 1);
+        }
+        currentDifference = calculateBezierDifference(
+          currentPoints,
+          currentUserPoints,
+        );
+      }
+
+      /**
+       * @param {CanvasRenderingContext2D} ctx
+       * @param {Array<{x: number, y: number}>} points
+       */
+      function drawBezier(ctx, points) {
+        ctx.moveTo(points[0].x, points[0].y);
+        if (points.length === 3) {
+          ctx.quadraticCurveTo(
+            points[1].x,
+            points[1].y,
+            points[2].x,
+            points[2].y,
+          );
+        } else if (points.length === 4) {
+          ctx.bezierCurveTo(
+            points[1].x,
+            points[1].y,
+            points[2].x,
+            points[2].y,
+            points[3].x,
+            points[3].y,
+          );
+        } else {
+          // For more than 4 points, we just sample points along the Bezier curve and draw lines between them
+          // TODO: Implement a more accurate Bezier curve drawing for arbitrary number of points
+          const n = points.length - 1;
+          for (let t = 0; t <= 1; t += 0.01) {
+            const p = getBezierPoint(points, t);
+            ctx.lineTo(p.x, p.y);
+          }
+          ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+        }
+      }
+
+      let winAnimationFrame = false;
+
+      function drawLevel() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.lineWidth = 2;
+        // Draw the Bezier curve
+        ctx.beginPath();
+        drawBezier(ctx, currentPoints);
+        ctx.setLineDash([5, 5]);
+        ctx.strokeStyle = "gray";
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // Draw the start and end points
+        ctx.fillStyle = "gray";
+        ctx.beginPath();
+        ctx.arc(currentPoints[0].x, currentPoints[0].y, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(
+          currentPoints[currentPoints.length - 1].x,
+          currentPoints[currentPoints.length - 1].y,
+          2,
+          0,
+          Math.PI * 2,
+        );
+        if (levelCreationMode) {
+          ctx.fillStyle = "red";
+          for (const point of currentPoints) {
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        ctx.fill();
+        if (gridSnap) {
+          ctx.strokeStyle = "rgba(0, 0, 0, 0.01)";
+          for (let x = 0; x < canvas.width; x += 10) {
+            for (let y = 0; y < canvas.height; y += 10) {
+              ctx.strokeRect(x, y, 10, 10);
+            }
+          }
+          if (draggingPoint) {
+            ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
+            ctx.beginPath();
+            ctx.moveTo(0, draggingPoint.y);
+            ctx.lineTo(canvas.width, draggingPoint.y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(draggingPoint.x, 0);
+            ctx.lineTo(draggingPoint.x, canvas.height);
+            ctx.stroke();
+          }
+        }
+        // Draw the user's Bezier curve
+        ctx.beginPath();
+        drawBezier(ctx, currentUserPoints);
+        ctx.strokeStyle = winAnimationFrame
+          ? `rgba(0, 255, 0, ${1 - Math.min((winAnimationFrame % 11) / 10, 1)})`
+          : "blue";
+        ctx.stroke();
+        // Draw the user control points
+        ctx.strokeStyle = "rgba(200, 200, 200, 0.5)";
+        ctx.beginPath();
+        for (let i = 0; i < currentUserPoints.length - 1; i++) {
+          const point = currentUserPoints[i];
+          const nextPoint = currentUserPoints[i + 1];
+          ctx.moveTo(point.x, point.y);
+          ctx.lineTo(nextPoint.x, nextPoint.y);
+        }
+        ctx.stroke();
+        ctx.font = "16px sans-serif";
+        ctx.fillStyle = "black";
+        for (const point of currentUserPoints) {
+          ctx.beginPath();
+          ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillText(`P${point.id + 1}`, point.x + 8, point.y - 8);
+        }
+        ctx.textAlign = "left";
+        ctx.fillText(
+          `Level ${currentLevelIndex + 1} of ${totalLevels()}`,
+          10,
+          20,
+        );
+        ctx.fillText(
+          `Difference: ${Math.sqrt(currentDifference).toFixed(2)}`,
+          10,
+          40,
+        );
+
+        ctx.fillStyle = "black";
+        ctx.textAlign = "center";
+        ctx.font = `${Math.min(winAnimationFrame - 10, 100)}px sans-serif`;
+        if (winAnimationFrame > 10) {
+          ctx.fillText("You've won!", canvas.width / 2, canvas.height / 2);
+        }
+        requestAnimationFrame(drawLevel);
+      }
+
+      function calculateBezierDifference(points1, points2) {
+        let samples1 = [];
+        let samples2 = [];
+        const numSamples = 100;
+        for (let i = 0; i <= numSamples; i++) {
+          const t = i / numSamples;
+          samples1.push(getBezierPoint(points1, t));
+          samples2.push(getBezierPoint(points2, t));
+        }
+        let totalDifference = 0;
+        for (const p1 of samples1) {
+          let minDistance = Infinity;
+          for (const p2 of samples2) {
+            const distance = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+            if (distance < minDistance) {
+              minDistance = distance;
+            }
+          }
+          totalDifference += minDistance;
+        }
+        return Math.pow(totalDifference / numSamples, 2);
+      }
+
+      function getBezierPoint(points, t) {
+        function factorial(n) {
+          if (n === 0 || n === 1) return 1;
+          let result = 1;
+          for (let i = 2; i <= n; i++) {
+            result *= i;
+          }
+          return result;
+        }
+        const n = points.length - 1;
+        let x = 0;
+        let y = 0;
+        for (let i = 0; i <= n; i++) {
+          const binomialCoeff =
+            factorial(n) / (factorial(i) * factorial(n - i));
+          const term = binomialCoeff * Math.pow(1 - t, n - i) * Math.pow(t, i);
+          x += term * points[i].x;
+          y += term * points[i].y;
+        }
+        return { x, y };
+      }
+
+      startLevel(currentLevelIndex).then(() => {
+        drawLevel();
+      });
+      let draggingPoint = null;
+      let currentKeys = new Set();
+      document.addEventListener("keydown", (event) => {
+        if (event.repeat) return; // Ignore repeated keydown events
+        currentKeys.add(event.key);
+        if (event.key === "Shift") {
+          gridSnap = !gridSnap;
+        } else if (event.key === "r") {
+          // Reset the current level
+          startLevel(currentLevelIndex);
+        } else if (event.key === "n" && levelCreationMode) {
+          // Go to the next level
+          if (currentLevelIndex + 1 < totalLevels()) {
+            startLevel(currentLevelIndex + 1);
+          }
+        } else if (event.key === "p") {
+          // Go to the previous level
+          if (currentLevelIndex - 1 >= 0) {
+            startLevel(currentLevelIndex - 1);
+          }
+        } else if (event.key === "c" && levelCreationMode) {
+          // Add a new control point at 10, 10
+          currentUserPoints.push({
+            x: 10,
+            y: 10,
+            id: currentUserPoints.length,
+          });
+          currentPoints.push({ x: 10, y: 10 });
+        } else if (event.key === "x" && levelCreationMode) {
+          // Remove the last control point
+          if (currentUserPoints.length > 0) {
+            currentUserPoints.pop();
+            currentPoints.pop();
+          }
+        } else if (event.key === "s" && levelCreationMode) {
+          // Save the current level configuration
+          const newLevel = {
+            start: currentUserPoints[0],
+            end: currentUserPoints[currentUserPoints.length - 1],
+            controlPoints: currentUserPoints.slice(1, -1),
+          };
+          levels.push(newLevel);
+          levelCache.storeCache();
+          console.log("Level saved:", newLevel);
+        }
+      });
+      document.addEventListener("keyup", (event) => {
+        currentKeys.delete(event.key);
+      });
+      canvas.addEventListener("mousedown", (event) => {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+
+        // Check if the mouse is over a control point
+        for (const point of currentUserPoints) {
+          const distance = Math.hypot(point.x - mouseX, point.y - mouseY);
+          if (distance < 10) {
+            // 10 pixels threshold
+            draggingPoint = point;
+            // recalculate the difference when a point is picked up
+            console.log(`Dragging point ${point.id}`);
+            break;
+          }
+        }
+      });
+      function eventLoop() {
+        if (
+          !draggingPoint &&
+          currentPoints.length > 0 &&
+          currentUserPoints.length > 0
+        ) {
+          currentDifference = calculateBezierDifference(
+            currentPoints,
+            currentUserPoints,
+          );
+          if (
+            currentDifference < requiredDifferenceThreshold &&
+            !winAnimationFrame
+          ) {
+            winAnimationFrame = 1;
+            console.log("Level completed!");
+            // Proceed to the next level after a short delay
+            const intervalId = setInterval(() => {
+              winAnimationFrame += 0.1;
+            }, 10);
+            setTimeout(() => {
+              if (currentLevelIndex + 1 < totalLevels()) {
+                startLevel(currentLevelIndex + 1);
+                winAnimationFrame = false;
+                console.log(`Starting level ${currentLevelIndex + 1}`);
+                clearInterval(intervalId);
+              } else {
+                console.log("All levels completed!");
+              }
+            }, 1000);
+          }
+        }
+        setTimeout(eventLoop, 100); // Check every 100ms
+      }
+      eventLoop();
+      canvas.addEventListener("mouseup", () => {
+        draggingPoint = null;
+      });
+      canvas.addEventListener("mousemove", (event) => {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+
+        if (draggingPoint) {
+          currentDifference = calculateBezierDifference(
+            currentPoints,
+            currentUserPoints,
+          );
+          if (gridSnap) {
+            // Snap to grid of 10 pixels
+            draggingPoint.x = Math.round(mouseX / 10) * 10;
+            draggingPoint.y = Math.round(mouseY / 10) * 10;
+          } else {
+            draggingPoint.x = mouseX;
+            draggingPoint.y = mouseY;
+          }
+        }
+
+        // Find the closest control point to the mouse
+        let closestPoint = null;
+        for (const point of currentUserPoints) {
+          const distance = Math.hypot(point.x - mouseX, point.y - mouseY);
+          if (distance < 10) {
+            // 10 pixels threshold
+            closestPoint = point;
+            break;
+          }
+        }
+        if (closestPoint) {
+          canvas.style.cursor = "all-scroll";
+        } else {
+          canvas.style.cursor = "default";
+        }
+      });
+    </script>
+  </body>
+</html>

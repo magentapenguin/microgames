@@ -15,5 +15,10 @@
         "description": "",
         "file": "falling_blocks.html",
         "highscore_key": "fallingBlocksHighScore"
+    },
+    "bezier_game": {
+        "name": "Bezier Game",
+        "description": "A game about recreating bezier curves.",
+        "file": "bezier_game.html"
     }
 }
