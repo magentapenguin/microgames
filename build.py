@@ -16,6 +16,10 @@ with open(os.path.join(build_dir, 'index.html'), 'w') as f:
     # Write the index.html file with the list of games
     f.write(main.index())
 
+with open(os.path.join(build_dir, 'sw.js'), 'w') as f:
+    sw_code = main.sw_js()
+    f.write(sw_code)
+
 shutil.copyfile(os.path.join('static', 'favicon.ico'), os.path.join(build_dir, 'favicon.ico'))
 
 print(f'Done!')

@@ -1,4 +1,4 @@
-import bottle, json, os, hashlib, colorsys
+import bottle, json, os, hashlib, colorsys, service_worker
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
@@ -18,6 +18,15 @@ def game(game_id):
     if not game:
         bottle.abort(404, 'Game not found')
     return bottle.static_file(game['file'], root='games')
+
+@app.route('/sw.js')
+def sw_js():
+    assets = [f'/microgames/game/{game_id}' for game_id in games.keys()]
+    assets += ['/microgames/' + f.replace('\\', '/') for f in service_worker.recursive_listdir('static')]
+    assets += ['/microgames']
+    sw_code = service_worker.generate_service_worker(assets)
+    bottle.response.content_type = 'application/javascript'
+    return sw_code
 
 @app.route('/favicon.ico')
 def favicon():
