@@ -173,9 +173,6 @@
             player.onButtonDown("right", ()=>{
                 player.addForce(k.vec2(800, 0))
             })
-            k.onTouchMove(pos => {
-                player.addForce(k.vec2(k.clamp(pos.x-player.pos.x,-800,800),0))
-            })
 
             function spawn() {
                 const holeX = k.rand(20, k.width()-20)
